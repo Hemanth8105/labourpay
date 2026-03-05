@@ -8,7 +8,7 @@
     <p>{{ month_name }} {{ selected_year }} — Monthly salary summary</p>
   </div>
   <div class="flex-gap">
-    <form method="GET" style="display:flex;gap:8px;align-items:center">
+    <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <select name="month" onchange="this.form.submit()" style="width:auto">
         {% for m in months %}
         <option value="{{ m.value }}" {% if m.value == selected_month %}selected{% endif %}>{{ m.label }}</option>
@@ -55,31 +55,47 @@
             {% if p.advance_deduction > 0 %}-₹{{ "{:,.0f}".format(p.advance_deduction) }}{% else %}—{% endif %}
           </td>
           <td class="mono" style="color:var(--accent2);font-weight:700">₹{{ "{:,.0f}".format(p.net_salary) }}</td>
-          <td>
+
+          <!-- BIG STATUS BLOCK -->
+          <td style="min-width:130px">
             {% if p.is_paid %}
-              <span class="badge badge-paid">Paid</span>
+              <div style="background:rgba(62,207,142,0.15);border:2px solid #3ECF8E;border-radius:10px;padding:10px 14px;text-align:center;">
+                <div style="font-size:22px">✅</div>
+                <div style="color:#3ECF8E;font-weight:800;font-size:16px;letter-spacing:1px">PAID</div>
+              </div>
             {% elif p.is_partial %}
-              <div style="display:flex;flex-direction:column;gap:3px">
-                <span class="badge badge-partial">Partial</span>
-                <span style="font-size:10px;color:var(--accent);font-family:monospace">✓ {{ p.partial_days }}d / ₹{{ "{:,.0f}".format(p.partial_amount) }}</span>
-                <span style="font-size:10px;color:var(--danger);font-family:monospace">⏳ {{ p.pending_days }}d / ₹{{ "{:,.0f}".format(p.pending_amount) }}</span>
+              <div style="background:rgba(245,166,35,0.15);border:2px solid #F5A623;border-radius:10px;padding:10px 14px;text-align:center;">
+                <div style="font-size:22px">⏳</div>
+                <div style="color:#F5A623;font-weight:800;font-size:16px;letter-spacing:1px">PARTIAL</div>
+                <div style="font-size:10px;color:var(--accent);font-family:monospace;margin-top:4px">✓ {{ p.partial_days }}d / ₹{{ "{:,.0f}".format(p.partial_amount) }}</div>
+                <div style="font-size:10px;color:var(--danger);font-family:monospace">⏳ {{ p.pending_days }}d / ₹{{ "{:,.0f}".format(p.pending_amount) }}</div>
               </div>
             {% else %}
-              <span class="badge badge-pending">Pending</span>
+              <div style="background:rgba(229,83,83,0.12);border:2px solid #E55353;border-radius:10px;padding:10px 14px;text-align:center;">
+                <div style="font-size:22px">🔴</div>
+                <div style="color:#E55353;font-weight:800;font-size:16px;letter-spacing:1px">PENDING</div>
+              </div>
             {% endif %}
           </td>
+
           <td>
             <div class="flex-gap" style="flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" onclick="showSlip({{ p|tojson }})">Slip</button>
-              {% if not p.is_paid %}
-                <!-- Full Pay -->
+              {% if p.is_paid %}
+                <form method="POST" action="{{ url_for('payroll.undo_paid') }}"
+                  onsubmit="return confirm('Undo payment for {{ p.name }}?')">
+                  <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
+                  <input type="hidden" name="month" value="{{ selected_month }}"/>
+                  <input type="hidden" name="year" value="{{ selected_year }}"/>
+                  <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;border-color:var(--danger)">↩ Undo</button>
+                </form>
+              {% else %}
                 <form method="POST" action="{{ url_for('payroll.mark_paid') }}">
                   <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
                   <input type="hidden" name="month" value="{{ selected_month }}"/>
                   <input type="hidden" name="year" value="{{ selected_year }}"/>
                   <button type="submit" class="btn btn-success btn-sm">Pay ✓</button>
                 </form>
-                <!-- Partial Pay -->
                 {% if p.effective_days > 0 %}
                 <button class="btn btn-ghost btn-sm" style="color:var(--accent);border-color:var(--accent)"
                   onclick="openPartialModal({{ p.employee_id }}, '{{ p.name }}', {{ p.effective_days }}, {{ p.daily_wage }})">
@@ -125,14 +141,12 @@
       <input type="hidden" name="employee_id" id="partialEmpId"/>
       <input type="hidden" name="month" value="{{ selected_month }}"/>
       <input type="hidden" name="year" value="{{ selected_year }}"/>
-
       <div class="form-group">
         <label>Days to Pay (max: <span id="partialMaxDays"></span> days)</label>
         <input type="number" name="paid_days" id="partialDaysInput"
           step="0.5" min="0.5" placeholder="e.g. 10"
           oninput="updatePartialPreview()" required/>
       </div>
-
       <div id="partialPreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;display:none">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px">
           <span style="color:var(--text3);font-size:12px">Paying now</span>
@@ -143,7 +157,6 @@
           <span id="previewPending" style="color:var(--danger);font-family:monospace"></span>
         </div>
       </div>
-
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('partialModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Record Partial Pay</button>
@@ -194,13 +207,11 @@ function showSlip(p) {
     ['===', '', false, null, false],
     ['NET SALARY', '₹' + Math.round(p.net_salary).toLocaleString('en-IN'), true, 'var(--accent2)', true],
   ];
-
   if (p.is_partial) {
     rows.push(['---', '', false, null, false]);
     rows.push(['Paid (' + p.partial_days + ' days)', '₹' + Math.round(p.partial_amount).toLocaleString('en-IN'), false, 'var(--accent2)', false]);
     rows.push(['Pending (' + p.pending_days + ' days)', '₹' + Math.round(p.pending_amount).toLocaleString('en-IN'), true, 'var(--danger)', false]);
   }
-
   let html = '';
   rows.forEach(([label, value, bold, color, large]) => {
     if (label === '---') { html += '<div style="border-top:1px solid var(--border);margin:4px 0"></div>'; return; }
@@ -210,7 +221,6 @@ function showSlip(p) {
       <span style="font-weight:${bold?700:400};color:${color||'var(--text)'};font-size:${large?18:13}px;font-family:'IBM Plex Mono',monospace">${value}</span>
     </div>`;
   });
-
   document.getElementById('slipContent').innerHTML = html;
   openModal('slipModal');
 }

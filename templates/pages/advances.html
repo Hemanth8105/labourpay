@@ -8,7 +8,13 @@
     <p>Track advance payments given to labourers</p>
   </div>
   <div class="flex-gap">
-    <form method="GET" style="display:flex;gap:8px;align-items:center">
+    <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select name="employee_id" onchange="this.form.submit()" style="width:auto">
+        <option value="">All Employees</option>
+        {% for emp in employees %}
+        <option value="{{ emp.id }}" {% if selected_employee == emp.id|string %}selected{% endif %}>{{ emp.name }}</option>
+        {% endfor %}
+      </select>
       <select name="month" onchange="this.form.submit()" style="width:auto">
         {% for m in months %}
         <option value="{{ m.value }}" {% if m.value == selected_month %}selected{% endif %}>{{ m.label }}</option>
@@ -30,6 +36,14 @@
     <div class="value orange mono">₹{{ "{:,.0f}".format(total) }}</div>
   </div>
   <div class="stat-card">
+    <div class="label">Total Recovered</div>
+    <div class="value green mono">₹{{ "{:,.0f}".format(total_recovered) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Remaining Balance</div>
+    <div class="value" style="color:var(--danger)" >₹{{ "{:,.0f}".format(total_remaining) }}</div>
+  </div>
+  <div class="stat-card">
     <div class="label">Transactions</div>
     <div class="value">{{ advances|length }}</div>
   </div>
@@ -40,20 +54,38 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>#</th><th>Employee</th><th>Amount</th><th>Date</th><th>Note</th><th></th></tr>
+        <tr><th>#</th><th>Employee</th><th>Advance</th><th>Recovered</th><th>Remaining</th><th>Date</th><th>Note</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for row in advances %}
+        {% set remaining = row.Advance.amount - (row.Advance.recovered or 0) %}
         <tr>
           <td style="color:var(--text3)">{{ loop.index }}</td>
           <td style="font-weight:600">{{ row.name }}</td>
-          <td><span class="mono" style="color:var(--danger)">-₹{{ "{:,.0f}".format(row.Advance.amount) }}</span></td>
+          <td><span class="mono" style="color:var(--danger)">₹{{ "{:,.0f}".format(row.Advance.amount) }}</span></td>
+          <td><span class="mono" style="color:var(--accent2)">₹{{ "{:,.0f}".format(row.Advance.recovered or 0) }}</span></td>
+          <td>
+            {% if remaining > 0 %}
+              <span class="mono" style="color:var(--danger);font-weight:700">₹{{ "{:,.0f}".format(remaining) }}</span>
+            {% else %}
+              <span style="color:var(--accent2);font-weight:700">✅ Cleared</span>
+            {% endif %}
+          </td>
           <td style="color:var(--text2);font-size:12px">{{ row.Advance.date.strftime('%d-%m-%Y') }}</td>
           <td style="color:var(--text2)">{{ row.Advance.note or '—' }}</td>
           <td>
-            <form method="POST" action="{{ url_for('advances.delete', adv_id=row.Advance.id) }}" onsubmit="return confirm('Delete this advance?')">
-              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-            </form>
+            <div class="flex-gap">
+              {% if remaining > 0 %}
+              <button class="btn btn-sm" style="background:var(--accent2);color:#000;border:none"
+                onclick="openRecoverModal({{ row.Advance.id }}, '{{ row.name }}', {{ remaining }})">
+                ↩ Recover
+              </button>
+              {% endif %}
+              <form method="POST" action="{{ url_for('advances.delete', adv_id=row.Advance.id) }}"
+                onsubmit="return confirm('Delete this advance?')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -62,12 +94,12 @@
   </div>
   {% else %}
   <div class="empty-state">
-    <p>No advances recorded this month.</p>
+    <p>No advances recorded for the selected filter.</p>
   </div>
   {% endif %}
 </div>
 
-<!-- Add Modal -->
+<!-- Add Advance Modal -->
 <div class="modal-overlay" id="addModal" style="display:none">
   <div class="modal">
     <h3>Record Advance Payment</h3>
@@ -90,7 +122,7 @@
         </div>
         <div class="form-group">
           <label>Date *</label>
-          <input type="date" name="date" value="{{ today.isoformat() if today is defined else '' }}" required/>
+          <input type="date" name="date" value="{{ selected_month|string + '-01' }}" required/>
         </div>
       </div>
       <div class="form-group">
@@ -104,4 +136,40 @@
     </form>
   </div>
 </div>
+
+<!-- Recover Advance Modal -->
+<div class="modal-overlay" id="recoverModal" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <h3>Recover Advance</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:4px">
+      Employee: <strong id="recoverEmpName" style="color:var(--text)"></strong>
+    </p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
+      Remaining Balance: <strong id="recoverRemaining" style="color:var(--danger);font-family:monospace"></strong>
+    </p>
+    <form method="POST" id="recoverForm">
+      <div class="form-group">
+        <label>Amount to Recover (₹) *</label>
+        <input type="number" name="recover_amount" id="recoverAmount"
+          placeholder="Enter amount" min="1" step="1" required/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('recoverModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Recover</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openRecoverModal(advId, empName, remaining) {
+  document.getElementById('recoverEmpName').textContent = empName;
+  document.getElementById('recoverRemaining').textContent = '₹' + remaining.toLocaleString('en-IN');
+  document.getElementById('recoverAmount').max = remaining;
+  document.getElementById('recoverForm').action = '/advances/recover/' + advId;
+  openModal('recoverModal');
+}
+</script>
 {% endblock %}

@@ -34,7 +34,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>#</th><th>Name</th><th>Daily Wage</th><th>Attendance</th></tr>
+          <tr><th>#</th><th>Name</th><th>Daily Wage</th><th>Attendance</th><th>History</th></tr>
         </thead>
         <tbody>
           {% for r in records %}
@@ -52,6 +52,10 @@
                   onclick="setStatus({{ r.id }}, 'absent', this)">A</button>
                 <input type="hidden" name="status_{{ r.id }}" id="status_{{ r.id }}" value="{{ r.status }}"/>
               </div>
+            </td>
+            <td>
+              <a href="{{ url_for('attendance.employee_view', emp_id=r.id) }}"
+                class="btn btn-ghost btn-sm" style="font-size:11px">📅 View Month</a>
             </td>
           </tr>
           {% endfor %}

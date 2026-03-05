@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.name }} Attendance — LabourPay{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h1>{{ employee.name }}</h1>
+    <p>Day-wise attendance — {{ month_name }} {{ selected_year }}</p>
+  </div>
+  <div class="flex-gap">
+    <!-- Employee Switcher -->
+    <select onchange="window.location='/attendance/employee/'+this.value+'?month={{ selected_month }}&year={{ selected_year }}'" style="width:auto">
+      {% for emp in employees %}
+      <option value="{{ emp.id }}" {% if emp.id == employee.id %}selected{% endif %}>{{ emp.name }}</option>
+      {% endfor %}
+    </select>
+    <!-- Month/Year Filter -->
+    <form method="GET" style="display:flex;gap:8px;align-items:center">
+      <select name="month" onchange="this.form.submit()" style="width:auto">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == selected_month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+      <select name="year" onchange="this.form.submit()" style="width:auto">
+        {% for y in range(current_year - 2, current_year + 2) %}
+        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('attendance.index') }}" class="btn btn-ghost">← Back</a>
+  </div>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px">
+  <div class="stat-card"><div class="label">Present Days</div><div class="value green">{{ present }}</div></div>
+  <div class="stat-card"><div class="label">Half Days</div><div class="value orange">{{ half }}</div></div>
+  <div class="stat-card"><div class="label">Absent Days</div><div class="value red">{{ absent }}</div></div>
+  <div class="stat-card"><div class="label">Effective Days</div><div class="value mono">{{ "%.1f"|format(effective) }}</div></div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Day</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in day_records %}
+        <tr>
+          <td style="color:var(--text3)">{{ loop.index }}</td>
+          <td style="font-family:monospace;font-size:13px">{{ r.date.strftime('%d %b %Y') }}</td>
+          <td style="color:var(--text2);font-size:13px">{{ r.day_name }}</td>
+          <td>
+            {% if r.status == 'present' %}
+              <span style="
+                display:inline-block;
+                background:rgba(62,207,142,0.15);
+                color:#3ECF8E;
+                border:1.5px solid #3ECF8E;
+                border-radius:8px;
+                padding:6px 18px;
+                font-size:15px;
+                font-weight:700;
+                letter-spacing:0.5px;
+                min-width:100px;
+                text-align:center;
+              ">✅ Present</span>
+            {% elif r.status == 'half_day' %}
+              <span style="
+                display:inline-block;
+                background:rgba(245,166,35,0.15);
+                color:#F5A623;
+                border:1.5px solid #F5A623;
+                border-radius:8px;
+                padding:6px 18px;
+                font-size:15px;
+                font-weight:700;
+                letter-spacing:0.5px;
+                min-width:100px;
+                text-align:center;
+              ">⏳ Half Day</span>
+            {% else %}
+              <span style="
+                display:inline-block;
+                background:rgba(229,83,83,0.12);
+                color:#E55353;
+                border:1.5px solid #E55353;
+                border-radius:8px;
+                padding:6px 18px;
+                font-size:15px;
+                font-weight:700;
+                letter-spacing:0.5px;
+                min-width:100px;
+                text-align:center;
+              ">❌ Absent</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
