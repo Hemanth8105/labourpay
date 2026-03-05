@@ -10,24 +10,57 @@
   <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Labourer</button>
 </div>
 
+<!-- Category Filter Buttons -->
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+  <a href="{{ url_for('employees.index', category='all') }}"
+    style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);
+    {% if active_category == 'all' %}background:var(--accent);color:#000;border-color:var(--accent){% else %}background:var(--bg3);color:var(--text2){% endif %}">
+    All
+  </a>
+  <a href="{{ url_for('employees.index', category='mason') }}"
+    style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);
+    {% if active_category == 'mason' %}background:#E55353;color:#fff;border-color:#E55353{% else %}background:var(--bg3);color:var(--text2){% endif %}">
+    🧱 Masons
+  </a>
+  <a href="{{ url_for('employees.index', category='female') }}"
+    style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);
+    {% if active_category == 'female' %}background:#9B59B6;color:#fff;border-color:#9B59B6{% else %}background:var(--bg3);color:var(--text2){% endif %}">
+    👩 Female
+  </a>
+  <a href="{{ url_for('employees.index', category='male') }}"
+    style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);
+    {% if active_category == 'male' %}background:#3498DB;color:#fff;border-color:#3498DB{% else %}background:var(--bg3);color:var(--text2){% endif %}">
+    👷 Male
+  </a>
+</div>
+
 <div class="card">
   {% if employees %}
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>#</th><th>Name</th><th>Phone</th><th>Daily Wage</th><th>Joined</th><th>Actions</th></tr>
+        <tr><th>#</th><th>Name</th><th>Category</th><th>Phone</th><th>Daily Wage</th><th>Joined</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for emp in employees %}
         <tr>
           <td style="color:var(--text3)">{{ loop.index }}</td>
           <td style="font-weight:600">{{ emp.name }}</td>
+          <td>
+            {% if emp.category == 'mason' %}
+              <span style="background:rgba(229,83,83,0.15);color:#E55353;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">🧱 Mason</span>
+            {% elif emp.category == 'female' %}
+              <span style="background:rgba(155,89,182,0.15);color:#9B59B6;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">👩 Female</span>
+            {% else %}
+              <span style="background:rgba(52,152,219,0.15);color:#3498DB;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">👷 Male</span>
+            {% endif %}
+          </td>
           <td style="color:var(--text2)">{{ emp.phone or '—' }}</td>
           <td><span class="mono" style="color:var(--accent)">₹{{ "{:,.0f}".format(emp.daily_wage) }}</span></td>
           <td style="color:var(--text2);font-size:12px">{{ emp.joining_date.strftime('%d-%m-%Y') if emp.joining_date else '—' }}</td>
           <td>
             <div class="flex-gap">
-              <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ emp.id }}, '{{ emp.name }}', '{{ emp.phone or '' }}', {{ emp.daily_wage }})">Edit</button>
+              <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ emp.id }}, '{{ emp.name }}', '{{ emp.phone or '' }}', {{ emp.daily_wage }}, '{{ emp.category or 'male' }}')">Edit</button>
               <form method="POST" action="{{ url_for('employees.delete', emp_id=emp.id) }}" onsubmit="return confirm('Remove {{ emp.name }}?')">
                 <button type="submit" class="btn btn-danger btn-sm">Remove</button>
               </form>
@@ -41,7 +74,7 @@
   {% else %}
   <div class="empty-state">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-    <p>No labourers added yet. Add your first worker!</p>
+    <p>No labourers found in this category.</p>
   </div>
   {% endif %}
 </div>
@@ -65,9 +98,19 @@
           <input type="number" name="daily_wage" placeholder="500" min="1" required/>
         </div>
       </div>
-      <div class="form-group">
-        <label>Joining Date</label>
-        <input type="date" name="joining_date"/>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category *</label>
+          <select name="category">
+            <option value="mason">🧱 Mason</option>
+            <option value="female">👩 Female</option>
+            <option value="male" selected>👷 Male</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Joining Date</label>
+          <input type="date" name="joining_date"/>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
@@ -96,6 +139,14 @@
           <input type="number" name="daily_wage" id="editWage" min="1" required/>
         </div>
       </div>
+      <div class="form-group">
+        <label>Category *</label>
+        <select name="category" id="editCategory">
+          <option value="mason">🧱 Mason</option>
+          <option value="female">👩 Female</option>
+          <option value="male">👷 Male</option>
+        </select>
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Update</button>
@@ -107,10 +158,11 @@
 
 {% block scripts %}
 <script>
-function openEditModal(id, name, phone, wage) {
+function openEditModal(id, name, phone, wage, category) {
   document.getElementById('editName').value = name;
   document.getElementById('editPhone').value = phone;
   document.getElementById('editWage').value = wage;
+  document.getElementById('editCategory').value = category;
   document.getElementById('editForm').action = '/employees/edit/' + id;
   openModal('editModal');
 }

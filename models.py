@@ -19,6 +19,7 @@ class Employee(db.Model):
     daily_wage = db.Column(db.Numeric(10, 2), nullable=False)
     joining_date = db.Column(db.Date, default=date.today)
     is_active = db.Column(db.Boolean, default=True)
+    category = db.Column(db.String(50), default='male')  # male, female, mason
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     attendance = db.relationship('Attendance', backref='employee', lazy=True, cascade='all, delete')
