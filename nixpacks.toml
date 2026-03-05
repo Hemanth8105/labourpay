@@ -1,13 +1,8 @@
 [phases.setup]
-nixPkgs = ["python313"]
+nixPkgs = ["python313", "postgresql"]
 
 [phases.install]
 cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
 
 [start]
 cmd = "gunicorn \"app:create_app()\""
-```
-
-And update your `Procfile`:
-```
-web: gunicorn "app:create_app()"
