@@ -23,7 +23,6 @@
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
     <input type="date" id="datePicker" value="{{ selected_date.isoformat() }}"
       onchange="window.location='/attendance?date='+this.value+'&view=daily'" style="width:auto"/>
-    <!-- Employee filter -->
     <select id="dailyEmpFilter" onchange="filterDailyTable()" style="width:auto">
       <option value="">All Employees</option>
       {% for r in records %}
@@ -95,24 +94,33 @@
 
 <!-- MONTH GRID VIEW -->
 <div id="gridView" style="display:none">
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-    <form method="GET" id="gridForm" style="display:flex;gap:8px;align-items:center">
-      <input type="hidden" name="view" value="grid"/>
-      <select name="grid_month" onchange="this.form.submit()" style="width:auto">
-        {% for m in grid_months %}
-        <option value="{{ m.value }}" {% if m.value == grid_selected_month %}selected{% endif %}>{{ m.label }}</option>
-        {% endfor %}
-      </select>
-      <select name="grid_year" onchange="this.form.submit()" style="width:auto">
-        {% for y in range(grid_current_year - 2, grid_current_year + 2) %}
-        <option value="{{ y }}" {% if y == grid_selected_year %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-      </select>
-    </form>
-    <!-- Employee search filter for grid -->
-    <input type="text" id="gridEmpFilter" placeholder="🔍 Search employee..."
-      oninput="filterGridTable()"
-      style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;min-width:200px"/>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;justify-content:space-between">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <form method="GET" id="gridForm" style="display:flex;gap:8px;align-items:center">
+        <input type="hidden" name="view" value="grid"/>
+        <select name="grid_month" onchange="this.form.submit()" style="width:auto">
+          {% for m in grid_months %}
+          <option value="{{ m.value }}" {% if m.value == grid_selected_month %}selected{% endif %}>{{ m.label }}</option>
+          {% endfor %}
+        </select>
+        <select name="grid_year" onchange="this.form.submit()" style="width:auto">
+          {% for y in range(grid_current_year - 2, grid_current_year + 2) %}
+          <option value="{{ y }}" {% if y == grid_selected_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <input type="text" id="gridEmpFilter" placeholder="🔍 Search employee..."
+        oninput="filterGridTable()"
+        style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;min-width:200px"/>
+    </div>
+  </div>
+
+  <!-- Excel Export Button always visible -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button onclick="exportToExcel()" class="btn btn-ghost btn-sm"
+      style="background:rgba(33,115,70,0.15);color:#21A366;border:1px solid rgba(33,115,70,0.3);font-size:13px;display:flex;align-items:center;gap:6px">
+      📥 Export Excel
+    </button>
   </div>
 
   <div class="card" style="overflow-x:auto">
@@ -123,9 +131,9 @@
           <th style="position:sticky;left:0;background:var(--bg2);z-index:2;min-width:40px;padding:8px 6px">#</th>
           <th style="position:sticky;left:40px;background:var(--bg2);z-index:2;min-width:130px;padding:8px 10px;text-align:left">Employee</th>
           {% for d in grid_days %}
-          <th style="padding:6px 4px;text-align:center;min-width:32px;color:var(--text3)">
-            <div style="font-size:10px">{{ d.strftime('%a')[0] }}</div>
-            <div style="font-size:11px;font-weight:700">{{ d.day }}</div>
+          <th style="padding:6px 4px;text-align:center;min-width:32px;color:var(--text3);{% if d.weekday() == 5 %}border-right:3px solid var(--border){% endif %}">
+            <div style="font-size:10px;{% if d.weekday() == 5 or d.weekday() == 6 %}color:#F5A623{% endif %}">{{ d.strftime('%a')[0] }}</div>
+            <div style="font-size:11px;font-weight:700;{% if d.weekday() == 5 or d.weekday() == 6 %}color:#F5A623{% endif %}">{{ d.day }}</div>
           </th>
           {% endfor %}
           <th style="padding:8px 10px;text-align:center;color:var(--accent2);min-width:50px">P</th>
@@ -141,7 +149,7 @@
           <td style="position:sticky;left:40px;background:var(--bg2);z-index:1;padding:8px 10px;font-weight:600;white-space:nowrap">{{ row.name }}</td>
           {% for d in grid_days %}
             {% set status = row.days.get(d, 'absent') %}
-            <td style="text-align:center;padding:4px 2px">
+            <td style="text-align:center;padding:4px 2px;{% if d.weekday() == 5 %}border-right:3px solid var(--border){% endif %}">
               {% if status == 'present' %}
                 <span style="display:inline-block;width:26px;height:26px;line-height:26px;border-radius:6px;background:rgba(62,207,142,0.2);color:#3ECF8E;font-weight:700;font-size:11px">P</span>
               {% elif status == 'half_day' %}
@@ -168,6 +176,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // View switching
 const urlParams = new URLSearchParams(window.location.search);
@@ -212,6 +221,53 @@ function markAll(status) {
     if (target) target.classList.add('active');
     document.getElementById('status_' + empId).value = status;
   });
+}
+
+function exportToExcel() {
+  const table = document.getElementById('gridTable');
+  if (!table) return;
+
+  // Build data array from table
+  const rows = [];
+
+  // Header row - extract text from header cells
+  const headerCells = table.querySelectorAll('thead tr th');
+  const headers = [];
+  headerCells.forEach(th => {
+    // Get day number + letter (e.g. "M 1") or just text
+    const divs = th.querySelectorAll('div');
+    if (divs.length === 2) {
+      headers.push(divs[1].textContent.trim() + ' ' + divs[0].textContent.trim());
+    } else {
+      headers.push(th.textContent.trim());
+    }
+  });
+  rows.push(headers);
+
+  // Data rows - only visible rows
+  table.querySelectorAll('tbody tr').forEach(tr => {
+    if (tr.style.display === 'none') return;
+    const rowData = [];
+    tr.querySelectorAll('td').forEach(td => {
+      rowData.push(td.textContent.trim());
+    });
+    rows.push(rowData);
+  });
+
+  // Get selected month/year for filename
+  const monthSel = document.querySelector('select[name="grid_month"]');
+  const yearSel = document.querySelector('select[name="grid_year"]');
+  const monthName = monthSel ? monthSel.options[monthSel.selectedIndex].text : 'Month';
+  const year = yearSel ? yearSel.value : '';
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = headers.map((h, i) => ({ wch: i <= 1 ? 20 : 6 }));
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+  XLSX.writeFile(wb, `Attendance_${monthName}_${year}.xlsx`);
 }
 </script>
 {% endblock %}
