@@ -13,7 +13,7 @@ def create_app():
     # Fix Railway's DATABASE_URL which uses postgresql:// instead of postgresql+psycopg2://
     db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/labour_payroll')
     if db_url.startswith('postgresql://'):
-        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        db_url = db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
