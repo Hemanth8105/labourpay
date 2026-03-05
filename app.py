@@ -5,21 +5,16 @@ import os
 
 load_dotenv()
 
-
-
 def create_app():
     app = Flask(__name__)
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_secret_key_change_this')
 
-    # Fix for Railway's postgres:// URL using pg8000 pure python driver
-    db_url = os.getenv('DATABASE_URL', 'postgresql+pg8000://postgres:password@localhost:5432/labour_payroll')
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql+pg8000://', 1)
-    elif db_url.startswith('postgresql://'):
-        db_url = db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
+    # Fix Railway's DATABASE_URL which uses postgresql:// instead of postgresql+psycopg2://
+    db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/labour_payroll')
+    if db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
