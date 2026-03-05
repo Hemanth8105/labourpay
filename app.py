@@ -12,10 +12,12 @@ def create_app():
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_secret_key_change_this')
 
-    # Fix for Railway's postgres:// URL (SQLAlchemy requires postgresql://)
-    db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/labour_payroll')
+    # Fix for Railway's postgres:// URL using pg8000 pure python driver
+    db_url = os.getenv('DATABASE_URL', 'postgresql+pg8000://postgres:password@localhost:5432/labour_payroll')
     if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        db_url = db_url.replace('postgres://', 'postgresql+pg8000://', 1)
+    elif db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+pg8000://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
