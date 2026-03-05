@@ -42,7 +42,6 @@ def calculate_payroll(year, month):
             employee_id=emp.id, month=month, year=year
         ).first()
 
-        # Partial payment support
         is_partial = False
         partial_days = 0
         partial_amount = 0
@@ -155,11 +154,11 @@ def undo_paid():
     ).first()
 
     if existing:
-        existing.is_paid = False
-        existing.paid_at = None
-        db.session.commit()
+        # Delete completely — goes back to original PENDING state
         employee = Employee.query.get(employee_id)
-        flash(f'Payment for {employee.name} has been undone successfully!', 'success')
+        db.session.delete(existing)
+        db.session.commit()
+        flash(f'Payment for {employee.name} undone! Status back to Pending.', 'success')
     else:
         flash('No payment record found to undo.', 'error')
 
@@ -212,6 +211,62 @@ def partial_pay():
 
     db.session.commit()
     flash(f'Partial pay recorded: {paid_days} days (₹{partial_amount:,.0f}). Pending: {pending_days} days (₹{pending_amount:,.0f}).', 'success')
+    return redirect(url_for('payroll.index', month=month, year=year))
+
+
+@payroll_bp.route('/payroll/pay-with-options', methods=['POST'])
+@login_required
+def pay_with_options():
+    employee_id = int(request.form.get('employee_id'))
+    month = int(request.form.get('month'))
+    year = int(request.form.get('year'))
+    advance_to_deduct = float(request.form.get('advance_to_deduct', 0))
+    amount_paying_now = float(request.form.get('amount_paying_now', 0))
+
+    data = calculate_payroll(year, month)
+    emp_data = next((p for p in data if p['employee_id'] == employee_id), None)
+
+    if not emp_data:
+        flash('Employee not found.', 'error')
+        return redirect(url_for('payroll.index', month=month, year=year))
+
+    if advance_to_deduct > emp_data['advance_deduction']:
+        flash(f'Advance deduction cannot exceed total advance ₹{emp_data["advance_deduction"]:,.0f}.', 'error')
+        return redirect(url_for('payroll.index', month=month, year=year))
+
+    gross = emp_data['gross_salary']
+    net_after_advance = gross - advance_to_deduct
+    pending_amount = net_after_advance - amount_paying_now
+    is_fully_paid = pending_amount <= 0
+
+    existing = Payroll.query.filter_by(employee_id=employee_id, month=month, year=year).first()
+    if existing:
+        existing.gross_salary = gross
+        existing.advance_deduction = advance_to_deduct
+        existing.net_salary = amount_paying_now
+        existing.present_days = emp_data['effective_days']
+        existing.is_paid = is_fully_paid
+        existing.paid_at = datetime.now()
+    else:
+        record = Payroll(
+            employee_id=employee_id, month=month, year=year,
+            present_days=emp_data['effective_days'],
+            daily_wage=emp_data['daily_wage'],
+            gross_salary=gross,
+            advance_deduction=advance_to_deduct,
+            net_salary=amount_paying_now,
+            is_paid=is_fully_paid,
+            paid_at=datetime.now()
+        )
+        db.session.add(record)
+
+    db.session.commit()
+
+    if is_fully_paid:
+        flash(f'{emp_data["name"]} fully paid! ₹{amount_paying_now:,.0f} paid, ₹{advance_to_deduct:,.0f} advance deducted.', 'success')
+    else:
+        flash(f'Payment recorded: ₹{amount_paying_now:,.0f} paid, ₹{advance_to_deduct:,.0f} advance deducted. Pending: ₹{pending_amount:,.0f}.', 'success')
+
     return redirect(url_for('payroll.index', month=month, year=year))
 
 

@@ -81,21 +81,40 @@
           <td>
             <div class="flex-gap" style="flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" onclick="showSlip({{ p|tojson }})">Slip</button>
-              {% if p.is_paid %}
+
+              {% if p.is_paid or p.is_partial %}
+                <!-- Undo button for both paid and partial -->
                 <form method="POST" action="{{ url_for('payroll.undo_paid') }}"
-                  onsubmit="return confirm('Undo payment for {{ p.name }}?')">
+                  onsubmit="return confirm('Undo payment for {{ p.name }}? Status will go back to Pending.')">
                   <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
                   <input type="hidden" name="month" value="{{ selected_month }}"/>
                   <input type="hidden" name="year" value="{{ selected_year }}"/>
                   <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;border-color:var(--danger)">↩ Undo</button>
                 </form>
               {% else %}
+                <!-- Pay Now (full auto) -->
                 <form method="POST" action="{{ url_for('payroll.mark_paid') }}">
                   <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
                   <input type="hidden" name="month" value="{{ selected_month }}"/>
                   <input type="hidden" name="year" value="{{ selected_year }}"/>
                   <button type="submit" class="btn btn-success btn-sm">Pay ✓</button>
                 </form>
+
+                <!-- Pay with Options -->
+                <button class="btn btn-sm" style="background:var(--accent);color:#000;border:none"
+                  onclick="openPayOptionsModal(
+                    {{ p.employee_id }},
+                    '{{ p.name }}',
+                    {{ p.gross_salary }},
+                    {{ p.advance_deduction }},
+                    {{ p.net_salary }},
+                    {{ p.daily_wage }},
+                    {{ p.effective_days }}
+                  )">
+                  ⚙️ Options
+                </button>
+
+                <!-- Partial Pay -->
                 {% if p.effective_days > 0 %}
                 <button class="btn btn-ghost btn-sm" style="color:var(--accent);border-color:var(--accent)"
                   onclick="openPartialModal({{ p.employee_id }}, '{{ p.name }}', {{ p.effective_days }}, {{ p.daily_wage }})">
@@ -164,12 +183,93 @@
     </form>
   </div>
 </div>
+
+<!-- Pay with Options Modal -->
+<div class="modal-overlay" id="payOptionsModal" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <h3>⚙️ Pay with Options</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
+      Employee: <strong id="optEmpName" style="color:var(--text)"></strong>
+    </p>
+
+    <!-- Summary Info -->
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--text3);font-size:12px">Gross Salary</span>
+        <span id="optGross" style="color:var(--text);font-family:monospace;font-weight:600"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--text3);font-size:12px">Total Advance Available</span>
+        <span id="optAdvanceAvail" style="color:var(--danger);font-family:monospace;font-weight:600"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--text3);font-size:12px">Full Net Salary</span>
+        <span id="optNet" style="color:var(--accent2);font-family:monospace;font-weight:700"></span>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('payroll.pay_with_options') }}">
+      <input type="hidden" name="employee_id" id="optEmpId"/>
+      <input type="hidden" name="month" value="{{ selected_month }}"/>
+      <input type="hidden" name="year" value="{{ selected_year }}"/>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>✂️ Advance to Deduct (₹)</label>
+          <input type="number" name="advance_to_deduct" id="optAdvanceDeduct"
+            step="1" min="0" placeholder="0"
+            oninput="updateOptionsPreview()" required/>
+          <small style="color:var(--text3)">Max: <span id="optMaxAdvance"></span></small>
+        </div>
+        <div class="form-group">
+          <label>💵 Amount Paying Now (₹)</label>
+          <input type="number" name="amount_paying_now" id="optAmountPaying"
+            step="1" min="0" placeholder="0"
+            oninput="updateOptionsPreview()" required/>
+        </div>
+      </div>
+
+      <!-- Live Preview -->
+      <div id="optPreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Payment Summary</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:var(--text3);font-size:12px">Gross Salary</span>
+          <span id="prevGross" style="font-family:monospace;font-size:13px"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:var(--text3);font-size:12px">Advance Deducted</span>
+          <span id="prevAdvDed" style="color:var(--danger);font-family:monospace;font-size:13px"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;border-top:1px solid var(--border);padding-top:6px">
+          <span style="color:var(--text3);font-size:12px">Net After Advance</span>
+          <span id="prevNetAdv" style="font-family:monospace;font-size:13px"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:var(--text3);font-size:12px">Paying Now</span>
+          <span id="prevPaying" style="color:var(--accent2);font-family:monospace;font-weight:700;font-size:13px"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:2px solid var(--accent);padding-top:6px;margin-top:4px">
+          <span style="font-weight:700;font-size:13px">Remaining Pending</span>
+          <span id="prevPending" style="font-family:monospace;font-weight:800;font-size:15px"></span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('payOptionsModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">✅ Record Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 let _partialWage = 0;
 let _partialMax = 0;
+let _optGross = 0;
+let _optAdvanceAvail = 0;
 
 function openPartialModal(empId, empName, maxDays, wage) {
   _partialWage = wage;
@@ -191,6 +291,48 @@ function updatePartialPreview() {
   const pending = (_partialMax - days) * _partialWage;
   document.getElementById('previewPayNow').textContent = '₹' + payNow.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('previewPending').textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0}) + ' (' + (_partialMax - days) + ' days)';
+  preview.style.display = 'block';
+}
+
+function openPayOptionsModal(empId, empName, gross, advanceAvail, net, wage, days) {
+  _optGross = gross;
+  _optAdvanceAvail = advanceAvail;
+  document.getElementById('optEmpId').value = empId;
+  document.getElementById('optEmpName').textContent = empName;
+  document.getElementById('optGross').textContent = '₹' + gross.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('optAdvanceAvail').textContent = '₹' + advanceAvail.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('optNet').textContent = '₹' + net.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('optMaxAdvance').textContent = '₹' + advanceAvail.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('optAdvanceDeduct').max = advanceAvail;
+  document.getElementById('optAdvanceDeduct').value = advanceAvail; // default: deduct all
+  document.getElementById('optAmountPaying').value = Math.max(0, net); // default: pay full net
+  document.getElementById('optPreview').style.display = 'none';
+  updateOptionsPreview();
+  openModal('payOptionsModal');
+}
+
+function updateOptionsPreview() {
+  const advDed = parseFloat(document.getElementById('optAdvanceDeduct').value) || 0;
+  const paying = parseFloat(document.getElementById('optAmountPaying').value) || 0;
+  const preview = document.getElementById('optPreview');
+
+  const netAfterAdv = _optGross - advDed;
+  const pending = netAfterAdv - paying;
+
+  document.getElementById('prevGross').textContent = '₹' + _optGross.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('prevAdvDed').textContent = '-₹' + advDed.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('prevNetAdv').textContent = '₹' + netAfterAdv.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('prevPaying').textContent = '₹' + paying.toLocaleString('en-IN', {maximumFractionDigits:0});
+
+  const pendingEl = document.getElementById('prevPending');
+  if (pending <= 0) {
+    pendingEl.textContent = '✅ Fully Paid';
+    pendingEl.style.color = '#3ECF8E';
+  } else {
+    pendingEl.textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0});
+    pendingEl.style.color = '#E55353';
+  }
+
   preview.style.display = 'block';
 }
 
