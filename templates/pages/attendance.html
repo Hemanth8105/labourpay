@@ -7,76 +7,196 @@
     <h1>Attendance</h1>
     <p>Mark daily attendance for your labourers</p>
   </div>
-  <input type="date" id="datePicker" value="{{ selected_date.isoformat() }}"
-    onchange="window.location='/attendance?date='+this.value" style="width:auto"/>
-</div>
-
-<div class="stat-grid" style="margin-bottom:16px">
-  <div class="stat-card"><div class="label">Present</div><div class="value green">{{ present }}</div></div>
-  <div class="stat-card"><div class="label">Half Day</div><div class="value orange">{{ half }}</div></div>
-  <div class="stat-card"><div class="label">Absent</div><div class="value red">{{ absent }}</div></div>
-  <div class="stat-card"><div class="label">Total</div><div class="value">{{ records|length }}</div></div>
-</div>
-
-<div class="card">
-  {% if records %}
-  <form method="POST" action="{{ url_for('attendance.save') }}">
-    <input type="hidden" name="date" value="{{ selected_date.isoformat() }}"/>
-
-    <div class="flex-between mb-4">
-      <span style="color:var(--text2);font-size:13px">Quick mark all:</span>
-      <div class="flex-gap">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('present')">✅ All Present</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('absent')">❌ All Absent</button>
-      </div>
+  <div class="flex-gap">
+    <!-- View Toggle -->
+    <div style="display:flex;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:3px">
+      <button id="btnDaily" class="btn btn-sm" onclick="switchView('daily')"
+        style="border-radius:6px;border:none;background:var(--accent);color:#000;font-size:12px">📅 Daily</button>
+      <button id="btnGrid" class="btn btn-sm" onclick="switchView('grid')"
+        style="border-radius:6px;border:none;background:transparent;color:var(--text2);font-size:12px">📊 Month Grid</button>
     </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>#</th><th>Name</th><th>Daily Wage</th><th>Attendance</th><th>History</th></tr>
-        </thead>
-        <tbody>
-          {% for r in records %}
-          <tr>
-            <td style="color:var(--text3)">{{ loop.index }}</td>
-            <td style="font-weight:600">{{ r.name }}</td>
-            <td><span class="mono" style="color:var(--accent)">₹{{ "{:,.0f}".format(r.daily_wage) }}</span></td>
-            <td>
-              <div class="att-toggle" data-emp="{{ r.id }}">
-                <button type="button" class="att-btn present {% if r.status == 'present' %}active{% endif %}"
-                  onclick="setStatus({{ r.id }}, 'present', this)">P</button>
-                <button type="button" class="att-btn half {% if r.status == 'half_day' %}active{% endif %}"
-                  onclick="setStatus({{ r.id }}, 'half_day', this)">½</button>
-                <button type="button" class="att-btn absent {% if r.status == 'absent' %}active{% endif %}"
-                  onclick="setStatus({{ r.id }}, 'absent', this)">A</button>
-                <input type="hidden" name="status_{{ r.id }}" id="status_{{ r.id }}" value="{{ r.status }}"/>
-              </div>
-            </td>
-            <td>
-              <a href="{{ url_for('attendance.employee_view', emp_id=r.id) }}"
-                class="btn btn-ghost btn-sm" style="font-size:11px">📅 View Month</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div style="margin-top:20px;display:flex;justify-content:flex-end">
-      <button type="submit" class="btn btn-primary">💾 Save Attendance</button>
-    </div>
-  </form>
-  {% else %}
-  <div class="empty-state">
-    <p>No labourers found. <a href="{{ url_for('employees.index') }}" style="color:var(--accent)">Add some workers first!</a></p>
   </div>
-  {% endif %}
 </div>
+
+<!-- DAILY VIEW -->
+<div id="dailyView">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <input type="date" id="datePicker" value="{{ selected_date.isoformat() }}"
+      onchange="window.location='/attendance?date='+this.value+'&view=daily'" style="width:auto"/>
+    <!-- Employee filter -->
+    <select id="dailyEmpFilter" onchange="filterDailyTable()" style="width:auto">
+      <option value="">All Employees</option>
+      {% for r in records %}
+      <option value="{{ r.name|lower }}">{{ r.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="stat-grid" style="margin-bottom:16px">
+    <div class="stat-card"><div class="label">Present</div><div class="value green">{{ present }}</div></div>
+    <div class="stat-card"><div class="label">Half Day</div><div class="value orange">{{ half }}</div></div>
+    <div class="stat-card"><div class="label">Absent</div><div class="value red">{{ absent }}</div></div>
+    <div class="stat-card"><div class="label">Total</div><div class="value">{{ records|length }}</div></div>
+  </div>
+
+  <div class="card">
+    {% if records %}
+    <form method="POST" action="{{ url_for('attendance.save') }}">
+      <input type="hidden" name="date" value="{{ selected_date.isoformat() }}"/>
+      <div class="flex-between mb-4">
+        <span style="color:var(--text2);font-size:13px">Quick mark all:</span>
+        <div class="flex-gap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('present')">✅ All Present</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('absent')">❌ All Absent</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="dailyTable">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Daily Wage</th><th>Attendance</th><th>History</th></tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr data-name="{{ r.name|lower }}">
+              <td style="color:var(--text3)">{{ loop.index }}</td>
+              <td style="font-weight:600">{{ r.name }}</td>
+              <td><span class="mono" style="color:var(--accent)">₹{{ "{:,.0f}".format(r.daily_wage) }}</span></td>
+              <td>
+                <div class="att-toggle" data-emp="{{ r.id }}">
+                  <button type="button" class="att-btn present {% if r.status == 'present' %}active{% endif %}"
+                    onclick="setStatus({{ r.id }}, 'present', this)">P</button>
+                  <button type="button" class="att-btn half {% if r.status == 'half_day' %}active{% endif %}"
+                    onclick="setStatus({{ r.id }}, 'half_day', this)">½</button>
+                  <button type="button" class="att-btn absent {% if r.status == 'absent' %}active{% endif %}"
+                    onclick="setStatus({{ r.id }}, 'absent', this)">A</button>
+                  <input type="hidden" name="status_{{ r.id }}" id="status_{{ r.id }}" value="{{ r.status }}"/>
+                </div>
+              </td>
+              <td>
+                <a href="{{ url_for('attendance.employee_view', emp_id=r.id) }}"
+                  class="btn btn-ghost btn-sm" style="font-size:11px">📅 View Month</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:20px;display:flex;justify-content:flex-end">
+        <button type="submit" class="btn btn-primary">💾 Save Attendance</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="empty-state">
+      <p>No labourers found. <a href="{{ url_for('employees.index') }}" style="color:var(--accent)">Add some workers first!</a></p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- MONTH GRID VIEW -->
+<div id="gridView" style="display:none">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <form method="GET" id="gridForm" style="display:flex;gap:8px;align-items:center">
+      <input type="hidden" name="view" value="grid"/>
+      <select name="grid_month" onchange="this.form.submit()" style="width:auto">
+        {% for m in grid_months %}
+        <option value="{{ m.value }}" {% if m.value == grid_selected_month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+      <select name="grid_year" onchange="this.form.submit()" style="width:auto">
+        {% for y in range(grid_current_year - 2, grid_current_year + 2) %}
+        <option value="{{ y }}" {% if y == grid_selected_year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <!-- Employee search filter for grid -->
+    <input type="text" id="gridEmpFilter" placeholder="🔍 Search employee..."
+      oninput="filterGridTable()"
+      style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;min-width:200px"/>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    {% if grid_data %}
+    <table id="gridTable" style="min-width:max-content;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr>
+          <th style="position:sticky;left:0;background:var(--bg2);z-index:2;min-width:40px;padding:8px 6px">#</th>
+          <th style="position:sticky;left:40px;background:var(--bg2);z-index:2;min-width:130px;padding:8px 10px;text-align:left">Employee</th>
+          {% for d in grid_days %}
+          <th style="padding:6px 4px;text-align:center;min-width:32px;color:var(--text3)">
+            <div style="font-size:10px">{{ d.strftime('%a')[0] }}</div>
+            <div style="font-size:11px;font-weight:700">{{ d.day }}</div>
+          </th>
+          {% endfor %}
+          <th style="padding:8px 10px;text-align:center;color:var(--accent2);min-width:50px">P</th>
+          <th style="padding:8px 10px;text-align:center;color:#F5A623;min-width:50px">½</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--danger);min-width:50px">AB</th>
+          <th style="padding:8px 10px;text-align:center;min-width:60px">Eff.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in grid_data %}
+        <tr data-name="{{ row.name|lower }}">
+          <td style="position:sticky;left:0;background:var(--bg2);z-index:1;padding:8px 6px;color:var(--text3);text-align:center">{{ loop.index }}</td>
+          <td style="position:sticky;left:40px;background:var(--bg2);z-index:1;padding:8px 10px;font-weight:600;white-space:nowrap">{{ row.name }}</td>
+          {% for d in grid_days %}
+            {% set status = row.days.get(d, 'absent') %}
+            <td style="text-align:center;padding:4px 2px">
+              {% if status == 'present' %}
+                <span style="display:inline-block;width:26px;height:26px;line-height:26px;border-radius:6px;background:rgba(62,207,142,0.2);color:#3ECF8E;font-weight:700;font-size:11px">P</span>
+              {% elif status == 'half_day' %}
+                <span style="display:inline-block;width:26px;height:26px;line-height:26px;border-radius:6px;background:rgba(245,166,35,0.2);color:#F5A623;font-weight:700;font-size:11px">½</span>
+              {% else %}
+                <span style="display:inline-block;width:26px;height:26px;line-height:26px;border-radius:6px;background:rgba(229,83,83,0.1);color:#E55353;font-weight:700;font-size:10px">AB</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+          <td style="text-align:center;color:#3ECF8E;font-weight:700;padding:8px 6px">{{ row.present }}</td>
+          <td style="text-align:center;color:#F5A623;font-weight:700;padding:8px 6px">{{ row.half }}</td>
+          <td style="text-align:center;color:#E55353;font-weight:700;padding:8px 6px">{{ row.absent }}</td>
+          <td style="text-align:center;font-weight:700;padding:8px 6px;color:var(--accent2)">{{ "%.1f"|format(row.effective) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><p>No attendance data for this month.</p></div>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+// View switching
+const urlParams = new URLSearchParams(window.location.search);
+const currentView = urlParams.get('view') || 'daily';
+if (currentView === 'grid') switchView('grid');
+
+function switchView(view) {
+  document.getElementById('dailyView').style.display = view === 'daily' ? 'block' : 'none';
+  document.getElementById('gridView').style.display = view === 'grid' ? 'block' : 'none';
+  document.getElementById('btnDaily').style.background = view === 'daily' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btnDaily').style.color = view === 'daily' ? '#000' : 'var(--text2)';
+  document.getElementById('btnGrid').style.background = view === 'grid' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btnGrid').style.color = view === 'grid' ? '#000' : 'var(--text2)';
+}
+
+function filterDailyTable() {
+  const val = document.getElementById('dailyEmpFilter').value;
+  document.querySelectorAll('#dailyTable tbody tr').forEach(row => {
+    row.style.display = !val || row.dataset.name === val ? '' : 'none';
+  });
+}
+
+function filterGridTable() {
+  const search = document.getElementById('gridEmpFilter').value.toLowerCase();
+  document.querySelectorAll('#gridTable tbody tr').forEach(row => {
+    row.style.display = row.dataset.name.includes(search) ? '' : 'none';
+  });
+}
+
 function setStatus(empId, status, btn) {
   const toggle = btn.closest('.att-toggle');
   toggle.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));

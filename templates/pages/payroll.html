@@ -31,20 +31,60 @@
   <div class="stat-card"><div class="label">Workers</div><div class="value">{{ payroll|length }}</div></div>
 </div>
 
+<!-- Search/Filter Box -->
+<div class="card" style="margin-bottom:12px;padding:12px 16px">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="color:var(--text3);font-size:13px">🔍 Filter:</span>
+    <input type="text" id="searchBox" placeholder="Search employee name..."
+      oninput="filterTable()"
+      style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px"/>
+    <select id="statusFilter" onchange="filterTable()" style="width:auto;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px">
+      <option value="">All Status</option>
+      <option value="paid">✅ Paid</option>
+      <option value="partial">⏳ Partial</option>
+      <option value="pending">🔴 Pending</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilter()">✕ Clear</button>
+  </div>
+</div>
+
 <div class="card">
   {% if payroll %}
   <div class="table-wrap">
-    <table>
+    <table id="payrollTable">
       <thead>
         <tr>
-          <th>Name</th><th>Wage/Day</th><th>Present</th><th>½ Day</th>
-          <th>Eff. Days</th><th>Gross</th><th>Advance</th><th>Net Pay</th>
-          <th>Status</th><th>Actions</th>
+          <th>#</th>
+          <th>Name</th>
+          <th>Wage/Day</th>
+          <th>Present</th>
+          <th>½ Day</th>
+          <th>Eff. Days</th>
+          <th>Gross</th>
+          <th>Advance</th>
+          <th>Paid Amt</th>
+          <th>Balance</th>
+          <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for p in payroll %}
-        <tr>
+        {% if p.is_paid %}
+          {% set paid_amt = p.net_salary %}
+          {% set balance = 0 %}
+          {% set status_key = 'paid' %}
+        {% elif p.is_partial %}
+          {% set paid_amt = p.partial_amount %}
+          {% set balance = p.pending_amount %}
+          {% set status_key = 'partial' %}
+        {% else %}
+          {% set paid_amt = 0 %}
+          {% set balance = p.net_salary %}
+          {% set status_key = 'pending' %}
+        {% endif %}
+        <tr data-name="{{ p.name|lower }}" data-status="{{ status_key }}">
+          <td style="color:var(--text3);font-weight:600">{{ loop.index }}</td>
           <td style="font-weight:600">{{ p.name }}</td>
           <td class="mono">₹{{ "{:,.0f}".format(p.daily_wage) }}</td>
           <td style="color:var(--present)">{{ p.present_days }}</td>
@@ -54,70 +94,51 @@
           <td class="mono" style="color:var(--danger)">
             {% if p.advance_deduction > 0 %}-₹{{ "{:,.0f}".format(p.advance_deduction) }}{% else %}—{% endif %}
           </td>
-          <td class="mono" style="color:var(--accent2);font-weight:700">₹{{ "{:,.0f}".format(p.net_salary) }}</td>
-
-          <!-- BIG STATUS BLOCK -->
-          <td style="min-width:130px">
-            {% if p.is_paid %}
-              <div style="background:rgba(62,207,142,0.15);border:2px solid #3ECF8E;border-radius:10px;padding:10px 14px;text-align:center;">
-                <div style="font-size:22px">✅</div>
-                <div style="color:#3ECF8E;font-weight:800;font-size:16px;letter-spacing:1px">PAID</div>
-              </div>
-            {% elif p.is_partial %}
-              <div style="background:rgba(245,166,35,0.15);border:2px solid #F5A623;border-radius:10px;padding:10px 14px;text-align:center;">
-                <div style="font-size:22px">⏳</div>
-                <div style="color:#F5A623;font-weight:800;font-size:16px;letter-spacing:1px">PARTIAL</div>
-                <div style="font-size:10px;color:var(--accent);font-family:monospace;margin-top:4px">✓ {{ p.partial_days }}d / ₹{{ "{:,.0f}".format(p.partial_amount) }}</div>
-                <div style="font-size:10px;color:var(--danger);font-family:monospace">⏳ {{ p.pending_days }}d / ₹{{ "{:,.0f}".format(p.pending_amount) }}</div>
-              </div>
+          <td class="mono" style="color:var(--accent2);font-weight:600">
+            {% if paid_amt > 0 %}₹{{ "{:,.0f}".format(paid_amt) }}{% else %}—{% endif %}
+          </td>
+          <td class="mono" style="font-weight:700">
+            {% if balance > 0 %}
+              <span style="color:var(--danger)">₹{{ "{:,.0f}".format(balance) }}</span>
             {% else %}
-              <div style="background:rgba(229,83,83,0.12);border:2px solid #E55353;border-radius:10px;padding:10px 14px;text-align:center;">
-                <div style="font-size:22px">🔴</div>
-                <div style="color:#E55353;font-weight:800;font-size:16px;letter-spacing:1px">PENDING</div>
-              </div>
+              <span style="color:#3ECF8E">✅ Nil</span>
             {% endif %}
           </td>
-
+          <!-- SIMPLE STATUS BADGE -->
+          <td>
+            {% if p.is_paid %}
+              <span style="background:#3ECF8E22;color:#3ECF8E;border:1.5px solid #3ECF8E;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">PAID</span>
+            {% elif p.is_partial %}
+              <span style="background:#F5A62322;color:#F5A623;border:1.5px solid #F5A623;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">PARTIAL</span>
+            {% else %}
+              <span style="background:#E5535322;color:#E55353;border:1.5px solid #E55353;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">PENDING</span>
+            {% endif %}
+          </td>
           <td>
             <div class="flex-gap" style="flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" onclick="showSlip({{ p|tojson }})">Slip</button>
-
               {% if p.is_paid or p.is_partial %}
-                <!-- Undo button for both paid and partial -->
                 <form method="POST" action="{{ url_for('payroll.undo_paid') }}"
-                  onsubmit="return confirm('Undo payment for {{ p.name }}? Status will go back to Pending.')">
+                  onsubmit="return confirm('Undo payment for {{ p.name }}?')">
                   <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
                   <input type="hidden" name="month" value="{{ selected_month }}"/>
                   <input type="hidden" name="year" value="{{ selected_year }}"/>
                   <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;border-color:var(--danger)">↩ Undo</button>
                 </form>
               {% else %}
-                <!-- Pay Now (full auto) -->
                 <form method="POST" action="{{ url_for('payroll.mark_paid') }}">
                   <input type="hidden" name="employee_id" value="{{ p.employee_id }}"/>
                   <input type="hidden" name="month" value="{{ selected_month }}"/>
                   <input type="hidden" name="year" value="{{ selected_year }}"/>
                   <button type="submit" class="btn btn-success btn-sm">Pay ✓</button>
                 </form>
-
-                <!-- Pay with Options -->
                 <button class="btn btn-sm" style="background:var(--accent);color:#000;border:none"
-                  onclick="openPayOptionsModal(
-                    {{ p.employee_id }},
-                    '{{ p.name }}',
-                    {{ p.gross_salary }},
-                    {{ p.advance_deduction }},
-                    {{ p.net_salary }},
-                    {{ p.daily_wage }},
-                    {{ p.effective_days }}
-                  )">
+                  onclick="openPayOptionsModal({{ p.employee_id }},'{{ p.name }}',{{ p.gross_salary }},{{ p.advance_deduction }},{{ p.net_salary }},{{ p.daily_wage }},{{ p.effective_days }})">
                   ⚙️ Options
                 </button>
-
-                <!-- Partial Pay -->
                 {% if p.effective_days > 0 %}
                 <button class="btn btn-ghost btn-sm" style="color:var(--accent);border-color:var(--accent)"
-                  onclick="openPartialModal({{ p.employee_id }}, '{{ p.name }}', {{ p.effective_days }}, {{ p.daily_wage }})">
+                  onclick="openPartialModal({{ p.employee_id }},'{{ p.name }}',{{ p.effective_days }},{{ p.daily_wage }})">
                   Partial
                 </button>
                 {% endif %}
@@ -129,6 +150,7 @@
       </tbody>
     </table>
   </div>
+  <div id="noResults" style="display:none;text-align:center;padding:32px;color:var(--text3)">No employees match your filter.</div>
   {% else %}
   <div class="empty-state"><p>No employees found.</p></div>
   {% endif %}
@@ -139,7 +161,7 @@
   <div class="modal" style="max-width:420px">
     <div style="text-align:center;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px">
       <h2 style="font-size:20px;color:var(--accent)">SALARY SLIP</h2>
-      <p id="slipMonthYear" style="color:var(--text3);font-size:12px;font-family:monospace">{{ month_name }} {{ selected_year }}</p>
+      <p style="color:var(--text3);font-size:12px;font-family:monospace">{{ month_name }} {{ selected_year }}</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px" id="slipContent"></div>
     <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
@@ -154,7 +176,7 @@
   <div class="modal" style="max-width:380px">
     <h3>Partial Payment</h3>
     <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
-      Pay for <strong id="partialEmpName" style="color:var(--text)"></strong> — enter how many days to pay now.
+      Pay for <strong id="partialEmpName" style="color:var(--text)"></strong>
     </p>
     <form method="POST" action="{{ url_for('payroll.partial_pay') }}">
       <input type="hidden" name="employee_id" id="partialEmpId"/>
@@ -162,9 +184,7 @@
       <input type="hidden" name="year" value="{{ selected_year }}"/>
       <div class="form-group">
         <label>Days to Pay (max: <span id="partialMaxDays"></span> days)</label>
-        <input type="number" name="paid_days" id="partialDaysInput"
-          step="0.5" min="0.5" placeholder="e.g. 10"
-          oninput="updatePartialPreview()" required/>
+        <input type="number" name="paid_days" id="partialDaysInput" step="0.5" min="0.5" placeholder="e.g. 10" oninput="updatePartialPreview()" required/>
       </div>
       <div id="partialPreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;display:none">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -191,8 +211,6 @@
     <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
       Employee: <strong id="optEmpName" style="color:var(--text)"></strong>
     </p>
-
-    <!-- Summary Info -->
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
         <span style="color:var(--text3);font-size:12px">Gross Salary</span>
@@ -207,29 +225,21 @@
         <span id="optNet" style="color:var(--accent2);font-family:monospace;font-weight:700"></span>
       </div>
     </div>
-
     <form method="POST" action="{{ url_for('payroll.pay_with_options') }}">
       <input type="hidden" name="employee_id" id="optEmpId"/>
       <input type="hidden" name="month" value="{{ selected_month }}"/>
       <input type="hidden" name="year" value="{{ selected_year }}"/>
-
       <div class="form-row">
         <div class="form-group">
           <label>✂️ Advance to Deduct (₹)</label>
-          <input type="number" name="advance_to_deduct" id="optAdvanceDeduct"
-            step="1" min="0" placeholder="0"
-            oninput="updateOptionsPreview()" required/>
+          <input type="number" name="advance_to_deduct" id="optAdvanceDeduct" step="1" min="0" placeholder="0" oninput="updateOptionsPreview()" required/>
           <small style="color:var(--text3)">Max: <span id="optMaxAdvance"></span></small>
         </div>
         <div class="form-group">
           <label>💵 Amount Paying Now (₹)</label>
-          <input type="number" name="amount_paying_now" id="optAmountPaying"
-            step="1" min="0" placeholder="0"
-            oninput="updateOptionsPreview()" required/>
+          <input type="number" name="amount_paying_now" id="optAmountPaying" step="1" min="0" placeholder="0" oninput="updateOptionsPreview()" required/>
         </div>
       </div>
-
-      <!-- Live Preview -->
       <div id="optPreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;display:none">
         <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Payment Summary</div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px">
@@ -249,11 +259,10 @@
           <span id="prevPaying" style="color:var(--accent2);font-family:monospace;font-weight:700;font-size:13px"></span>
         </div>
         <div style="display:flex;justify-content:space-between;border-top:2px solid var(--accent);padding-top:6px;margin-top:4px">
-          <span style="font-weight:700;font-size:13px">Remaining Pending</span>
+          <span style="font-weight:700;font-size:13px">Balance Remaining</span>
           <span id="prevPending" style="font-family:monospace;font-weight:800;font-size:15px"></span>
         </div>
       </div>
-
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('payOptionsModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">✅ Record Payment</button>
@@ -261,19 +270,37 @@
     </form>
   </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-let _partialWage = 0;
-let _partialMax = 0;
-let _optGross = 0;
-let _optAdvanceAvail = 0;
+let _partialWage = 0, _partialMax = 0;
+let _optGross = 0, _optAdvanceAvail = 0;
+
+function filterTable() {
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  const rows = document.querySelectorAll('#payrollTable tbody tr');
+  let visible = 0;
+  rows.forEach(row => {
+    const name = row.dataset.name || '';
+    const rowStatus = row.dataset.status || '';
+    const matchName = name.includes(search);
+    const matchStatus = !status || rowStatus === status;
+    if (matchName && matchStatus) { row.style.display = ''; visible++; }
+    else row.style.display = 'none';
+  });
+  document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
+}
+
+function clearFilter() {
+  document.getElementById('searchBox').value = '';
+  document.getElementById('statusFilter').value = '';
+  filterTable();
+}
 
 function openPartialModal(empId, empName, maxDays, wage) {
-  _partialWage = wage;
-  _partialMax = maxDays;
+  _partialWage = wage; _partialMax = maxDays;
   document.getElementById('partialEmpId').value = empId;
   document.getElementById('partialEmpName').textContent = empName;
   document.getElementById('partialMaxDays').textContent = maxDays;
@@ -290,13 +317,12 @@ function updatePartialPreview() {
   const payNow = days * _partialWage;
   const pending = (_partialMax - days) * _partialWage;
   document.getElementById('previewPayNow').textContent = '₹' + payNow.toLocaleString('en-IN', {maximumFractionDigits:0});
-  document.getElementById('previewPending').textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0}) + ' (' + (_partialMax - days) + ' days)';
+  document.getElementById('previewPending').textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0});
   preview.style.display = 'block';
 }
 
 function openPayOptionsModal(empId, empName, gross, advanceAvail, net, wage, days) {
-  _optGross = gross;
-  _optAdvanceAvail = advanceAvail;
+  _optGross = gross; _optAdvanceAvail = advanceAvail;
   document.getElementById('optEmpId').value = empId;
   document.getElementById('optEmpName').textContent = empName;
   document.getElementById('optGross').textContent = '₹' + gross.toLocaleString('en-IN', {maximumFractionDigits:0});
@@ -304,9 +330,8 @@ function openPayOptionsModal(empId, empName, gross, advanceAvail, net, wage, day
   document.getElementById('optNet').textContent = '₹' + net.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('optMaxAdvance').textContent = '₹' + advanceAvail.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('optAdvanceDeduct').max = advanceAvail;
-  document.getElementById('optAdvanceDeduct').value = advanceAvail; // default: deduct all
-  document.getElementById('optAmountPaying').value = Math.max(0, net); // default: pay full net
-  document.getElementById('optPreview').style.display = 'none';
+  document.getElementById('optAdvanceDeduct').value = advanceAvail;
+  document.getElementById('optAmountPaying').value = Math.max(0, net);
   updateOptionsPreview();
   openModal('payOptionsModal');
 }
@@ -314,26 +339,16 @@ function openPayOptionsModal(empId, empName, gross, advanceAvail, net, wage, day
 function updateOptionsPreview() {
   const advDed = parseFloat(document.getElementById('optAdvanceDeduct').value) || 0;
   const paying = parseFloat(document.getElementById('optAmountPaying').value) || 0;
-  const preview = document.getElementById('optPreview');
-
   const netAfterAdv = _optGross - advDed;
   const pending = netAfterAdv - paying;
-
   document.getElementById('prevGross').textContent = '₹' + _optGross.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('prevAdvDed').textContent = '-₹' + advDed.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('prevNetAdv').textContent = '₹' + netAfterAdv.toLocaleString('en-IN', {maximumFractionDigits:0});
   document.getElementById('prevPaying').textContent = '₹' + paying.toLocaleString('en-IN', {maximumFractionDigits:0});
-
   const pendingEl = document.getElementById('prevPending');
-  if (pending <= 0) {
-    pendingEl.textContent = '✅ Fully Paid';
-    pendingEl.style.color = '#3ECF8E';
-  } else {
-    pendingEl.textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0});
-    pendingEl.style.color = '#E55353';
-  }
-
-  preview.style.display = 'block';
+  if (pending <= 0) { pendingEl.textContent = '✅ Fully Paid'; pendingEl.style.color = '#3ECF8E'; }
+  else { pendingEl.textContent = '₹' + pending.toLocaleString('en-IN', {maximumFractionDigits:0}); pendingEl.style.color = '#E55353'; }
+  document.getElementById('optPreview').style.display = 'block';
 }
 
 function showSlip(p) {
@@ -352,7 +367,7 @@ function showSlip(p) {
   if (p.is_partial) {
     rows.push(['---', '', false, null, false]);
     rows.push(['Paid (' + p.partial_days + ' days)', '₹' + Math.round(p.partial_amount).toLocaleString('en-IN'), false, 'var(--accent2)', false]);
-    rows.push(['Pending (' + p.pending_days + ' days)', '₹' + Math.round(p.pending_amount).toLocaleString('en-IN'), true, 'var(--danger)', false]);
+    rows.push(['Balance Pending', '₹' + Math.round(p.pending_amount).toLocaleString('en-IN'), true, 'var(--danger)', false]);
   }
   let html = '';
   rows.forEach(([label, value, bold, color, large]) => {
