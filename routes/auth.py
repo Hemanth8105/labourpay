@@ -22,22 +22,23 @@ def login():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    # Only allow registration if no users exist
-    if User.query.count() > 0:
-        flash('An account already exists. Please login.', 'error')
-        return redirect(url_for('auth.login'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         if not username or not password:
             flash('Username and password are required.', 'error')
         else:
-            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user = User(username=username, password=hashed)
-            db.session.add(user)
-            db.session.commit()
-            flash('Account created! Please login.', 'success')
-            return redirect(url_for('auth.login'))
+            # Check if username already taken
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user:
+                flash('Username already taken. Please choose another.', 'error')
+            else:
+                hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                user = User(username=username, password=hashed)
+                db.session.add(user)
+                db.session.commit()
+                flash('Account created! Please login.', 'success')
+                return redirect(url_for('auth.login'))
     return render_template('pages/register.html')
 
 
