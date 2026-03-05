@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Advances — LabourPay{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h1>Advances</h1>
+    <p>Track advance payments given to labourers</p>
+  </div>
+  <div class="flex-gap">
+    <form method="GET" style="display:flex;gap:8px;align-items:center">
+      <select name="month" onchange="this.form.submit()" style="width:auto">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == selected_month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+      <select name="year" onchange="this.form.submit()" style="width:auto">
+        {% for y in range(current_year - 2, current_year + 2) %}
+        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <button class="btn btn-primary" onclick="openModal('addModal')">+ Record Advance</button>
+  </div>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px">
+  <div class="stat-card">
+    <div class="label">Total Advances</div>
+    <div class="value orange mono">₹{{ "{:,.0f}".format(total) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Transactions</div>
+    <div class="value">{{ advances|length }}</div>
+  </div>
+</div>
+
+<div class="card">
+  {% if advances %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Employee</th><th>Amount</th><th>Date</th><th>Note</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in advances %}
+        <tr>
+          <td style="color:var(--text3)">{{ loop.index }}</td>
+          <td style="font-weight:600">{{ row.name }}</td>
+          <td><span class="mono" style="color:var(--danger)">-₹{{ "{:,.0f}".format(row.Advance.amount) }}</span></td>
+          <td style="color:var(--text2);font-size:12px">{{ row.Advance.date.strftime('%d-%m-%Y') }}</td>
+          <td style="color:var(--text2)">{{ row.Advance.note or '—' }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('advances.delete', adv_id=row.Advance.id) }}" onsubmit="return confirm('Delete this advance?')">
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No advances recorded this month.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal" style="display:none">
+  <div class="modal">
+    <h3>Record Advance Payment</h3>
+    <form method="POST" action="{{ url_for('advances.add') }}">
+      <input type="hidden" name="month" value="{{ selected_month }}"/>
+      <input type="hidden" name="year" value="{{ selected_year }}"/>
+      <div class="form-group">
+        <label>Labourer *</label>
+        <select name="employee_id" required>
+          <option value="">Select labourer...</option>
+          {% for emp in employees %}
+          <option value="{{ emp.id }}">{{ emp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" name="amount" placeholder="500" min="1" required/>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="date" value="{{ today.isoformat() if today is defined else '' }}" required/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Note (optional)</label>
+        <input type="text" name="note" placeholder="e.g. Emergency advance"/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Record Advance</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

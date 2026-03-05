@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Labourers — LabourPay{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h1>Labourers</h1>
+    <p>Manage your daily wage workers</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Labourer</button>
+</div>
+
+<div class="card">
+  {% if employees %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Name</th><th>Phone</th><th>Daily Wage</th><th>Joined</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+        <tr>
+          <td style="color:var(--text3)">{{ loop.index }}</td>
+          <td style="font-weight:600">{{ emp.name }}</td>
+          <td style="color:var(--text2)">{{ emp.phone or '—' }}</td>
+          <td><span class="mono" style="color:var(--accent)">₹{{ "{:,.0f}".format(emp.daily_wage) }}</span></td>
+          <td style="color:var(--text2);font-size:12px">{{ emp.joining_date.strftime('%d-%m-%Y') if emp.joining_date else '—' }}</td>
+          <td>
+            <div class="flex-gap">
+              <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ emp.id }}, '{{ emp.name }}', '{{ emp.phone or '' }}', {{ emp.daily_wage }})">Edit</button>
+              <form method="POST" action="{{ url_for('employees.delete', emp_id=emp.id) }}" onsubmit="return confirm('Remove {{ emp.name }}?')">
+                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    <p>No labourers added yet. Add your first worker!</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal" style="display:none">
+  <div class="modal">
+    <h3>Add New Labourer</h3>
+    <form method="POST" action="{{ url_for('employees.add') }}">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" name="name" placeholder="e.g. Ramu Kumar" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" name="phone" placeholder="9876543210"/>
+        </div>
+        <div class="form-group">
+          <label>Daily Wage (₹) *</label>
+          <input type="number" name="daily_wage" placeholder="500" min="1" required/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Joining Date</label>
+        <input type="date" name="joining_date"/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Labourer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal" style="display:none">
+  <div class="modal">
+    <h3>Edit Labourer</h3>
+    <form method="POST" id="editForm">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" name="name" id="editName" required/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" name="phone" id="editPhone"/>
+        </div>
+        <div class="form-group">
+          <label>Daily Wage (₹) *</label>
+          <input type="number" name="daily_wage" id="editWage" min="1" required/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditModal(id, name, phone, wage) {
+  document.getElementById('editName').value = name;
+  document.getElementById('editPhone').value = phone;
+  document.getElementById('editWage').value = wage;
+  document.getElementById('editForm').action = '/employees/edit/' + id;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

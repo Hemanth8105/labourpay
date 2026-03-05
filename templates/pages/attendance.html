@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Attendance — LabourPay{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="page-header" style="margin-bottom:0">
+    <h1>Attendance</h1>
+    <p>Mark daily attendance for your labourers</p>
+  </div>
+  <input type="date" id="datePicker" value="{{ selected_date.isoformat() }}"
+    onchange="window.location='/attendance?date='+this.value" style="width:auto"/>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px">
+  <div class="stat-card"><div class="label">Present</div><div class="value green">{{ present }}</div></div>
+  <div class="stat-card"><div class="label">Half Day</div><div class="value orange">{{ half }}</div></div>
+  <div class="stat-card"><div class="label">Absent</div><div class="value red">{{ absent }}</div></div>
+  <div class="stat-card"><div class="label">Total</div><div class="value">{{ records|length }}</div></div>
+</div>
+
+<div class="card">
+  {% if records %}
+  <form method="POST" action="{{ url_for('attendance.save') }}">
+    <input type="hidden" name="date" value="{{ selected_date.isoformat() }}"/>
+
+    <div class="flex-between mb-4">
+      <span style="color:var(--text2);font-size:13px">Quick mark all:</span>
+      <div class="flex-gap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('present')">✅ All Present</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="markAll('absent')">❌ All Absent</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Daily Wage</th><th>Attendance</th></tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td style="color:var(--text3)">{{ loop.index }}</td>
+            <td style="font-weight:600">{{ r.name }}</td>
+            <td><span class="mono" style="color:var(--accent)">₹{{ "{:,.0f}".format(r.daily_wage) }}</span></td>
+            <td>
+              <div class="att-toggle" data-emp="{{ r.id }}">
+                <button type="button" class="att-btn present {% if r.status == 'present' %}active{% endif %}"
+                  onclick="setStatus({{ r.id }}, 'present', this)">P</button>
+                <button type="button" class="att-btn half {% if r.status == 'half_day' %}active{% endif %}"
+                  onclick="setStatus({{ r.id }}, 'half_day', this)">½</button>
+                <button type="button" class="att-btn absent {% if r.status == 'absent' %}active{% endif %}"
+                  onclick="setStatus({{ r.id }}, 'absent', this)">A</button>
+                <input type="hidden" name="status_{{ r.id }}" id="status_{{ r.id }}" value="{{ r.status }}"/>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:20px;display:flex;justify-content:flex-end">
+      <button type="submit" class="btn btn-primary">💾 Save Attendance</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="empty-state">
+    <p>No labourers found. <a href="{{ url_for('employees.index') }}" style="color:var(--accent)">Add some workers first!</a></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setStatus(empId, status, btn) {
+  const toggle = btn.closest('.att-toggle');
+  toggle.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('status_' + empId).value = status;
+}
+
+function markAll(status) {
+  document.querySelectorAll('.att-toggle').forEach(toggle => {
+    const empId = toggle.dataset.emp;
+    toggle.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));
+    const target = toggle.querySelector('.att-btn.' + (status === 'half_day' ? 'half' : status));
+    if (target) target.classList.add('active');
+    document.getElementById('status_' + empId).value = status;
+  });
+}
+</script>
+{% endblock %}

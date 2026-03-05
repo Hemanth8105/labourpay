@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — LabourPay{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p>{{ today.strftime('%A, %d %B %Y') }}</p>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="label">Total Labourers</div>
+    <div class="value">{{ total_employees }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Present Today</div>
+    <div class="value green">{{ present_today }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Absent Today</div>
+    <div class="value red">{{ absent_today }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Month Advances</div>
+    <div class="value orange mono">₹{{ "{:,.0f}".format(month_advances) }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="font-size:15px;margin-bottom:12px;font-weight:700;">Quick Actions</h3>
+  <div class="flex-gap">
+    <a href="{{ url_for('attendance.index') }}" class="btn btn-primary">📅 Mark Today's Attendance</a>
+    <a href="{{ url_for('payroll.index') }}" class="btn btn-ghost">🧮 View Payroll</a>
+    <a href="{{ url_for('advances.index') }}" class="btn btn-ghost">💰 Record Advance</a>
+  </div>
+</div>
+{% endblock %}
