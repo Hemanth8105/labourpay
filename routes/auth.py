@@ -94,8 +94,11 @@ def change_password():
         elif current_password == new_password:
             flash('New password must be different from current password.', 'error')
         else:
+            # Query fresh from DB to avoid Flask-Login proxy issue
+            user = User.query.get(current_user.id)
             hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-            current_user.password = hashed
+            user.password = hashed
+            db.session.add(user)
             db.session.commit()
             flash('Password changed successfully!', 'success')
             return redirect(url_for('dashboard.index'))
